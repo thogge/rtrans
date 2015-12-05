@@ -21,9 +21,12 @@ def makemap():
     size = 11
     mole = 'co'
 
+    #Path to jobfiles
+    path = '/Users/connorr/Desktop/Radex/bin/jobfiles/'
 
     #Set up the grid
     b = np.tile(np.arange(size), (size,1))
+
     x = np.transpose(b)
 
     r = np.sqrt(b**2 + x**2)
@@ -39,17 +42,20 @@ def makemap():
     #Make the job files
     for bind in b[0]:
         for xind in x[:,0]:
-            input(mole, T[xind, bind], N[xind, bind], n[xind, bind], bind, xind)
+            input(mole, T[xind, bind], N[xind, bind], n[xind, bind], bind, xind, path)
 
     #Run the job files
-    run()
+    run(path = path)
 
-    tau = extract(size, mole)
+    tau = extract(r,size, mole, path)
 
-    pdb.set_trace()
+
+    #Assume that tau = 0 outside of sphere    
+    sphere = -(r-size)>0
+    return tau*sphere
     
 
-def extract(size,mole,path ='/Users/connorr/Desktop/Radex/bin/jobfiles/'):
+def extract(r,size,mole,path):
     '''
     PURPOSE:
     
@@ -70,8 +76,12 @@ def extract(size,mole,path ='/Users/connorr/Desktop/Radex/bin/jobfiles/'):
     Array containing all the information about tau ordered by x and b.
 
     '''
-    
+
     fnames = glob.glob(path+'*.out')
+
+    #Set the number of rows to skip
+    #Seems to be right number for co, but I do remember something about
+    #it changing between molecules so may want to check the .out files
     skip = 13
 
     #Read in data
@@ -86,15 +96,15 @@ def extract(size,mole,path ='/Users/connorr/Desktop/Radex/bin/jobfiles/'):
         bind = f.split(path+mole+'_')[1].split('_')[0]
         xind = f.split(bind+'_')[1].split('.')[0]
 
-        #unsorted.append([temptau,float(bind),float(xind)])
-        
-        
         temptau =  np.loadtxt(f, skiprows = skip, usecols = [7])
         tau[xind,bind] = temptau[line]
- #       os.system('rm '+f)
+
+        #Remove the jobfiles
+        os.system('rm '+f)
         os.system('rm '+f[0:-3]+'inp')
 
     #Remove all the files that did not run.
+    #Note: If there are more than 10000 files this will fail.
     os.system('rm '+path+'*inp')
 
     return tau
@@ -173,7 +183,7 @@ def Tfunc(r, power = 2, Tin=100, Tout=10, constant = False):
 
 
     
-def input(mole,tkin,N,den,b,x,path ='/Users/connorr/Desktop/Radex/bin/jobfiles/', trad = 2.73):
+def input(mole,tkin,N,den,b,x,path, trad = 2.73):
 
     '''
     PURPOSE: 
@@ -196,7 +206,7 @@ def input(mole,tkin,N,den,b,x,path ='/Users/connorr/Desktop/Radex/bin/jobfiles/'
     x: x coordinate measured from the center of the cloud. Again should be in the form of the index of a resolution element.
 
     OPTIONAL INPUTS:
-    path: Path containing the output job files. By default set to /Users/connorr/Desktop/Radex/bin/jobfiles/
+    path: Path containing the output job files. 
     trad: Radiation temperature, by default set to 2.73.
     '''
     
@@ -242,7 +252,7 @@ def input(mole,tkin,N,den,b,x,path ='/Users/connorr/Desktop/Radex/bin/jobfiles/'
     infile.write(str(linewidth)+'\n')
 
 
-def run(path= '/Users/connorr/Desktop/Radex/bin/jobfiles/'):
+def run(path):
     #Runs ALL the jobfiles in the path at once
     filelist = glob.glob(path+'*.inp')
 
