@@ -43,7 +43,7 @@ def rtrans():
     #Flips and copies the tau map
     taumap = np.hstack((quad[:,::-1], quad))
 
-    vel = makevel(r, n, rc)
+    vel = make_vel()
     velmap = np.hstack((-vel[:,::-1], vel))
 
     T = Tfunc(r, power = 2)
@@ -178,41 +178,37 @@ def makemap(size, mole, nc, rc, abundance):
 
     return tau*sphere
     
-def makevel(r, n, rc):
-    '''
-    PURPOSE:
-    
-    Makes an array of free fall velocities for a collapsing sphere
+def vel(r,m_mol,T_in,T_out,gamma):
 
-    INPUT:
-
-    r: Array with the values of r in index coordinates
-
-    rc: Radius of the cloud
-    
-
-    OUTPUT:
-    
-    Array containing the velocity at each location
-    
-
-    '''
-
-    Rout = len(r)-1
-
-    pc = 3.09e18#m/pc
-    mh = 1.67e-24#g
-    mu = 2.3# Assuming molecular cloud
-    
-    G = 6.67e-8#m^3/(kg s^2)
-
-    l = (rc * pc)/Rout
-
-    M = np.sum((l**3) * (n) * mh*mu)
-
-    v = np.sqrt(2*G*M*(1/(r*l) - 1/(Rout*l)))
-
+    # r is in units of cloud radius
+    k = 1.38e-16
+    v = np.sqrt(-(4*k/m_mol)*(T_in*np.log(r)+((T_in-T_out)/(gamma*(gamma+1)))*(r**gamma-1)))
     return v
+
+def vel_rad(v_center,x,b):
+
+    r = np.sqrt(x**2+b**2)
+    v_rad = v_center*x/r
+    return v_rad 
+    
+def make_vel():
+    k = 1.38e-16
+    m_mol = 28*1.67e-24
+    T_in = 100
+    T_out = 10
+    gamma = 2
+    x_range = 25
+    y_range = 25
+    r_max = np.sqrt(x_range**2+y_range**2)
+    vel_arr = np.zeros((y_range,x_range))
+    for i in range(0,y_range):
+        for j in range(1,x_range):
+            r = np.sqrt(i**2+j**2)
+            vel_arr[i,j] = vel_rad(vel(r/r_max,m_mol,T_in,T_out,gamma),j,i)
+    #plt.pcolor(np.arange(x_range),np.arange(y_range),vel_arr/1e5)
+    #plt.colorbar()
+    #plt.show()
+    return vel_arr
 
 def extract(r,size,mole,path):
     '''
