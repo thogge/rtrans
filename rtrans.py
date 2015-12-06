@@ -4,7 +4,135 @@ import matplotlib.pyplot as plt
 import glob, os
 import os
 
-def makemap():
+
+
+
+def rtrans():
+    '''
+    PURPOSE:
+    Does radiative transfer for a collapsing cloud
+
+    '''
+    
+    size = 11
+    mole = 'co'
+    massmole = 28*1.67e-24#g
+    nc = 1e3#cm^-3
+    rc = 1#pc
+    abundance = 1e-15#molecules/H2
+
+
+    nures = 100
+    nu_0 = 115e9#Hz (Using CO1-0
+
+
+    #Set up coordinates
+    b = np.tile(np.arange(size), (size,1))
+    x = np.transpose(b)
+    r = np.sqrt(b**2 + x**2)
+
+    T = Tfunc(r, power = 2)
+    den = denfunc(r, nc = nc, rc = rc, abundance = abundance)
+    n = den[0]
+    N = den[1]
+
+    Rout = len(r)-1
+    
+    quad = makemap(size, mole, nc, rc, abundance)
+
+    #Flips and copies the tau map
+    taumap = np.hstack((quad[:,::-1], quad))
+
+    vel = makevel(r, n, rc)
+    velmap = np.hstack((-vel[:,::-1], vel))
+
+    T = Tfunc(r, power = 2)
+    Tmap = np.hstack((T[:,::-1], T))
+
+    
+
+    delvel =1
+
+    velrange = np.arange(0, nures, delvel)
+
+    gauss(taumap, Tmap, velmap, nu_0,  massmole, velrange)
+    
+    #Get tau as a function of nu via velocity
+    
+    
+def gauss(tau, T, v, nu_0, massmole, velrange):
+    '''
+    PURPOSE:
+
+    Broadens tau into a gaussian and shifts it based on velocity
+
+    INPUTS:
+
+    tau: Array of tau. Not yet a function of nu
+
+    T: Array of temperatures in the cloud
+
+    v: Array of radial velocities in the cloud
+
+    nures: Resolution of the spectra
+
+    nu_0: Rest value of nu
+
+    OUTPUTS:
+
+    3D Map of Tau with velocity (frequency)  dependance on the Z axis
+
+    '''
+
+    k = 1.38e-16#cgs units
+    
+    pdb.set_trace()
+    
+    taunu = np.zeros((np.shape(tau)[0], np.shape(tau)[1], len(velrange)))
+
+    vtherm = np.sqrt(2*k*T/massmole) 
+    
+    for t,index in self.tau.flat:      
+        taunu(index) = 1/(vtherm(index)*sqrt(np.pi)) * np.exp()
+    
+    
+    
+    
+
+def Inuout(Iin, tau, T, nu):
+    '''
+    PURPOSE:
+    
+    Updates the intensity in a cell as a function of nu
+
+    INPUT:
+    
+    Iin: Incoming intensity as a function of nu
+
+    tau: Optical depth as a function of nu
+
+    T: Kinetic temperature of the gas
+    
+    nu: Array containing nu
+
+    '''
+    
+    Iout = Iin*exp(-tau) + Bnu(T,nu)*(1-np.exp(-tau))
+    
+    return Iout
+    
+
+def Bnu(T, nu):
+
+    h = 6.63e-27#erg s
+    c = 3e10#cm/s
+    k = 1.38e-16#erg K^-1
+    
+    B = 2*h*nu**3/c**2/(np.exp(h*nu/(k*T))-1)
+
+    return B
+
+def makemap(size, mole, nc, rc, abundance):
 
     '''
     PURPOSE:
@@ -15,11 +143,6 @@ def makemap():
     Parameters for the model are defined below
 
     '''
-
-
-    #Set parameters
-    size = 11
-    mole = 'co'
 
     #Path to jobfiles
     path = '/Users/connorr/Desktop/Radex/bin/jobfiles/'
@@ -33,9 +156,9 @@ def makemap():
 
 
     #Calculate density and temperature
-    T = Tfunc(r)
-
-    den = denfunc(r)
+    T = Tfunc(r, power = 2)
+    
+    den = denfunc(r, nc = nc, rc = rc, abundance = abundance)
     n = den[0]
     N = den[1]
 
@@ -51,9 +174,45 @@ def makemap():
 
 
     #Assume that tau = 0 outside of sphere    
-    sphere = -(r-size)>0
+    sphere = -(r-size+1)>0
+
     return tau*sphere
     
+def makevel(r, n, rc):
+    '''
+    PURPOSE:
+    
+    Makes an array of free fall velocities for a collapsing sphere
+
+    INPUT:
+
+    r: Array with the values of r in index coordinates
+
+    rc: Radius of the cloud
+    
+
+    OUTPUT:
+    
+    Array containing the velocity at each location
+    
+
+    '''
+
+    Rout = len(r)-1
+
+    pc = 3.09e18#m/pc
+    mh = 1.67e-24#g
+    mu = 2.3# Assuming molecular cloud
+    
+    G = 6.67e-8#m^3/(kg s^2)
+
+    l = (rc * pc)/Rout
+
+    M = np.sum((l**3) * (n) * mh*mu)
+
+    v = np.sqrt(2*G*M*(1/(r*l) - 1/(Rout*l)))
+
+    return v
 
 def extract(r,size,mole,path):
     '''
@@ -109,7 +268,7 @@ def extract(r,size,mole,path):
 
     return tau
     
-def denfunc(r, nc = 1e2, rc = 3, abundance = 1e-4):
+def denfunc(r, nc, rc, abundance):
 
     '''
     PURPOSE:
@@ -136,8 +295,7 @@ def denfunc(r, nc = 1e2, rc = 3, abundance = 1e-4):
     '''
     
     pc = 3.09e18#cm
-
-
+    
     rout = len(r)-1
 
     n = nc * (rout**2/(rout**2 + r**2))
@@ -212,7 +370,7 @@ def input(mole,tkin,N,den,b,x,path, trad = 2.73):
     
     #Makes the jobfiles
     
-    linewidth = 0
+    linewidth = 4
 
 
     #format b with 5 significant digits
@@ -248,8 +406,8 @@ def input(mole,tkin,N,den,b,x,path, trad = 2.73):
     infile.write(str(den)+'\n')
     infile.write(str(trad)+'\n')
     infile.write(str(Nsci)+'\n')
-    infile.write(str(1.0)+'\n')
     infile.write(str(linewidth)+'\n')
+    infile.write(str(0)+'\n')
 
 
 def run(path):
@@ -257,6 +415,7 @@ def run(path):
     filelist = glob.glob(path+'*.inp')
 
     for file in filelist:
+
         os.system('radex < '+file)
         os.system('mv '+ os.getcwd()+'/'+str.split(file[0:-3],path)[1]+'out '+file[0:-3]+'out')
         
